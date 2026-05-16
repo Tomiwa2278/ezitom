@@ -33,7 +33,7 @@ async function syncToGoogleSheets(formData) {
         await fetch(scriptUrl, {
             method: 'POST',
             mode: 'no-cors', // Apps Script requires no-cors for simple triggers
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify(formData)
         });
         console.log('[dev.folio DEBUG] Synced to Google Sheets.');
