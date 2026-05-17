@@ -193,8 +193,12 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script src="assets/js/auth.js"></script>
     <script>
+        // Synchronize accounts from Google Sheets on load
+        AuthManager.syncAccountsFromServer();
+
         // Redirect already-authenticated admins directly to the dashboard
         if (AuthManager.isAuthenticated()) {
             window.location.href = 'admin.html';

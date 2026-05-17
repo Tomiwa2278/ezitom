@@ -11,6 +11,9 @@
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/x-icon" href="assets/favicon/favicon.ico">
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="config.js"></script>
     <style>
         body {
             display: flex;
@@ -50,6 +53,7 @@
         .auth-subtitle {
             color: var(--text2);
             font-size: 0.95rem;
+            line-height: 1.5;
         }
 
         .form-group {
@@ -72,6 +76,7 @@
             color: var(--text);
             font-family: inherit;
             transition: all 0.3s;
+            box-sizing: border-box;
         }
 
         .form-input:focus {
@@ -92,11 +97,21 @@
             transition: transform 0.2s;
             font-family: inherit;
             margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
 
-        .auth-btn:hover {
+        .auth-btn:hover:not(:disabled) {
             transform: translateY(-2px);
             opacity: 0.9;
+        }
+
+        .auth-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .auth-footer {
@@ -132,6 +147,118 @@
             color: var(--accent);
             border: 1px solid rgba(0, 212, 200, 0.2);
         }
+
+        /* OTP Input Row */
+        .otp-row {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .otp-input {
+            width: 48px;
+            height: 56px;
+            text-align: center;
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-family: 'Syne', sans-serif;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        .otp-input:focus {
+            border-color: var(--accent);
+            background: rgba(255, 255, 255, 0.07);
+            box-shadow: 0 0 0 3px rgba(0, 212, 200, 0.15);
+        }
+
+        .otp-input.filled {
+            border-color: var(--accent);
+        }
+
+        /* Step indicators */
+        .steps {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .step-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: all 0.3s;
+        }
+
+        .step-dot.active {
+            background: var(--accent);
+            width: 24px;
+            border-radius: 4px;
+        }
+
+        .step-dot.done {
+            background: var(--accent);
+            opacity: 0.4;
+        }
+
+        /* Step panels */
+        .step-panel {
+            display: none;
+        }
+
+        .step-panel.active {
+            display: block;
+        }
+
+        /* Resend timer */
+        .resend-row {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text2);
+        }
+
+        .resend-link {
+            color: var(--accent);
+            cursor: pointer;
+            font-weight: 600;
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: inherit;
+            padding: 0;
+        }
+
+        .resend-link:disabled {
+            color: var(--text2);
+            cursor: default;
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(0, 0, 0, 0.3);
+            border-top-color: #000;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7HVT5JRQRH"></script>
@@ -148,50 +275,304 @@
     <div class="auth-card">
         <div class="auth-header">
             <img src="images/logo/Logo-1.png" alt="Logo" class="auth-logo">
-            <h1 class="auth-title">Create account</h1>
-            <p class="auth-subtitle">Get started with your Gmail address</p>
+            <h1 class="auth-title" id="pageTitle">Create account</h1>
+            <p class="auth-subtitle" id="pageSubtitle">Get started with your Gmail address</p>
+        </div>
+
+        <!-- Step dots -->
+        <div class="steps">
+            <div class="step-dot active" id="dot1"></div>
+            <div class="step-dot" id="dot2"></div>
         </div>
 
         <div id="alert" class="alert"></div>
 
-        <form id="signupForm">
-            <div class="form-group">
-                <label class="form-label">Gmail Address</label>
-                <input type="email" id="email" class="form-input" placeholder="example@gmail.com" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Create Password</label>
-                <input type="password" id="password" class="form-input" placeholder="••••••••" required>
-            </div>
+        <!-- STEP 1: Enter details -->
+        <div class="step-panel active" id="step1">
+            <form id="signupDetailsForm">
+                <div class="form-group">
+                    <label class="form-label">Gmail Address</label>
+                    <input type="email" id="email" class="form-input" placeholder="example@gmail.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Create Password</label>
+                    <input type="password" id="password" class="form-input" placeholder="••••••••" minlength="6" required>
+                </div>
 
-            <button type="submit" class="auth-btn">Sign up</button>
-        </form>
+                <button type="submit" class="auth-btn" id="sendBtn">
+                    <span id="sendBtnText">Send Verification Code</span>
+                    <div class="spinner" id="sendSpinner"></div>
+                </button>
+            </form>
+        </div>
 
-        <div class="auth-footer">
+        <!-- STEP 2: Enter OTP -->
+        <div class="step-panel" id="step2">
+            <p style="text-align:center; color: var(--text2); font-size:0.9rem; margin-bottom:1.5rem;">
+                We sent a 6-digit verification code to <strong id="sentToEmail" style="color:var(--text);"></strong>
+            </p>
+            <div class="otp-row">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" id="otp0">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" id="otp1">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" id="otp2">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" id="otp3">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" id="otp4">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" id="otp5">
+            </div>
+            
+            <button type="button" class="auth-btn" id="verifyBtn" onclick="verifyCode()">Verify & Register</button>
+
+            <div class="resend-row">
+                Didn't receive it?
+                <button class="resend-link" id="resendBtn" onclick="resendCode()" disabled>
+                    Resend in <span id="resendTimer">60</span>s
+                </button>
+            </div>
+        </div>
+
+        <div class="auth-footer" id="authFooter">
             Already have an account? <a href="login.html">Sign in</a>
         </div>
     </div>
 
     <script src="assets/js/auth.js"></script>
     <script>
-        document.getElementById('signupForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const alertEl = document.getElementById('alert');
+        // ── State ──────────────────────────────────────────
+        let generatedCode = '';
+        let targetEmail = '';
+        let targetPassword = '';
+        let resendInterval = null;
 
-            const result = AuthManager.signup(email, password);
-            if (result.success) {
-                alertEl.className = 'alert alert-success';
-                alertEl.textContent = result.message + ' Redirecting...';
-                alertEl.style.display = 'block';
-                setTimeout(() => window.location.href = 'login.html', 2000);
-            } else {
-                alertEl.className = 'alert alert-error';
-                alertEl.textContent = result.message;
-                alertEl.style.display = 'block';
+        // Synchronize accounts from Google Sheets on page load
+        AuthManager.syncAccountsFromServer();
+
+        // ── EmailJS init ───────────────────────────────────
+        emailjs.init(window.CONFIG.EMAILJS_PUBLIC_KEY);
+
+        // ── Helpers ────────────────────────────────────────
+        function showAlert(msg, type = 'error') {
+            const el = document.getElementById('alert');
+            el.className = 'alert alert-' + type;
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function hideAlert() {
+            document.getElementById('alert').style.display = 'none';
+        }
+
+        function goToStep(n) {
+            document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('step' + n).classList.add('active');
+
+            // Update dots
+            const dot1 = document.getElementById('dot1');
+            const dot2 = document.getElementById('dot2');
+            
+            if (n === 1) {
+                dot1.className = 'step-dot active';
+                dot2.className = 'step-dot';
+                document.getElementById('pageTitle').textContent = 'Create account';
+                document.getElementById('pageSubtitle').textContent = 'Get started with your Gmail address';
+                document.getElementById('authFooter').style.display = 'block';
+            } else if (n === 2) {
+                dot1.className = 'step-dot done';
+                dot2.className = 'step-dot active';
+                document.getElementById('pageTitle').textContent = 'Verify your email';
+                document.getElementById('pageSubtitle').textContent = 'Check your inbox for the 6-digit code';
+                document.getElementById('authFooter').style.display = 'none';
+            }
+            hideAlert();
+        }
+
+        function makeCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        // ── Step 1: Submit Details & Send OTP ──────────────
+        document.getElementById('signupDetailsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim().toLowerCase();
+            const password = document.getElementById('password').value;
+
+            // Basic checks
+            if (!email.endsWith('@gmail.com')) {
+                showAlert('Only Gmail addresses are allowed.');
+                return;
+            }
+            if (password.length < 6) {
+                showAlert('Password must be at least 6 characters.');
+                return;
+            }
+
+            // Check if account already exists locally (which synced from server on load)
+            const accounts = AuthManager.getAccounts();
+            if (accounts.some(acc => acc.email === email)) {
+                showAlert('This email is already registered.');
+                return;
+            }
+
+            // Show loading
+            const btn = document.getElementById('sendBtn');
+            const btnText = document.getElementById('sendBtnText');
+            const spinner = document.getElementById('sendSpinner');
+            
+            btnText.textContent = 'Sending Code...';
+            spinner.style.display = 'block';
+            btn.disabled = true;
+            hideAlert();
+
+            generatedCode = makeCode();
+            targetEmail = email;
+            targetPassword = password;
+
+            try {
+                await emailjs.send(
+                    window.CONFIG.EMAILJS_SERVICE_ID,
+                    window.CONFIG.EMAILJS_TEMPLATE_ID,
+                    {
+                        from_name: 'dev.folio Sign Up Verification',
+                        from_email: email,
+                        subject: 'Your Sign Up Verification Code',
+                        message: `Your verification code is: ${generatedCode}\n\nUse this code to verify your email and complete your signup.`,
+                        date_time: new Date().toLocaleString()
+                    }
+                );
+
+                // Success — transition to Step 2
+                document.getElementById('sentToEmail').textContent = email;
+                goToStep(2);
+                startResendTimer();
+                document.getElementById('otp0').focus();
+
+            } catch (err) {
+                console.error('EmailJS signup OTP error:', err);
+                showAlert('Failed to send verification code. Please try again.');
+            } finally {
+                btnText.textContent = 'Send Verification Code';
+                spinner.style.display = 'none';
+                btn.disabled = false;
             }
         });
+
+        // ── Step 2: OTP inputs auto-advance ────────────────
+        document.querySelectorAll('.otp-input').forEach((input, idx, inputs) => {
+            input.addEventListener('input', () => {
+                input.value = input.value.replace(/\D/g, '');
+                if (input.value) {
+                    input.classList.add('filled');
+                    if (idx < inputs.length - 1) inputs[idx + 1].focus();
+                } else {
+                    input.classList.remove('filled');
+                }
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !input.value && idx > 0) {
+                    inputs[idx - 1].focus();
+                }
+            });
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+                [...pasted].forEach((char, i) => {
+                    if (inputs[idx + i]) {
+                        inputs[idx + i].value = char;
+                        inputs[idx + i].classList.add('filled');
+                    }
+                });
+                const nextEmpty = [...inputs].findIndex(inp => !inp.value);
+                if (nextEmpty !== -1) inputs[nextEmpty].focus();
+            });
+        });
+
+        async function verifyCode() {
+            const entered = [...document.querySelectorAll('.otp-input')].map(i => i.value).join('');
+            if (entered.length < 6) {
+                showAlert('Please enter all 6 digits.');
+                return;
+            }
+            if (entered !== generatedCode) {
+                showAlert('Incorrect verification code. Please try again.');
+                document.querySelectorAll('.otp-input').forEach(i => {
+                    i.style.borderColor = '#ff3b30';
+                    setTimeout(() => i.style.borderColor = '', 1000);
+                });
+                return;
+            }
+
+            // OTP verified! Save account
+            clearInterval(resendInterval);
+            const verifyBtn = document.getElementById('verifyBtn');
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = 'Verifying & Registering...';
+            hideAlert();
+
+            try {
+                const signupResult = await AuthManager.signup(targetEmail, targetPassword);
+                if (signupResult.success) {
+                    showAlert('Account created successfully! Redirecting to login...', 'success');
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
+                } else {
+                    showAlert(signupResult.message);
+                    verifyBtn.disabled = false;
+                    verifyBtn.textContent = 'Verify & Register';
+                }
+            } catch (err) {
+                console.error('Signup finalize error:', err);
+                showAlert('An unexpected error occurred during signup. Please try again.');
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = 'Verify & Register';
+            }
+        }
+
+        // ── Resend Timer Logic ──────────────────────────────
+        function startResendTimer() {
+            let seconds = 60;
+            const timerEl = document.getElementById('resendTimer');
+            const resendBtn = document.getElementById('resendBtn');
+            resendBtn.disabled = true;
+            timerEl.parentElement.innerHTML = 'Resend in <span id="resendTimer">' + seconds + '</span>s';
+
+            resendInterval = setInterval(() => {
+                seconds--;
+                const t = document.getElementById('resendTimer');
+                if (t) t.textContent = seconds;
+                if (seconds <= 0) {
+                    clearInterval(resendInterval);
+                    const row = document.querySelector('.resend-row');
+                    if (row) row.innerHTML = 'Didn\'t receive it? <button class="resend-link" onclick="resendCode()">Resend code</button>';
+                }
+            }, 1000);
+        }
+
+        async function resendCode() {
+            generatedCode = makeCode();
+            showAlert('A new code is being sent...', 'success');
+            
+            try {
+                await emailjs.send(
+                    window.CONFIG.EMAILJS_SERVICE_ID,
+                    window.CONFIG.EMAILJS_TEMPLATE_ID,
+                    {
+                        from_name: 'dev.folio Sign Up Verification',
+                        from_email: targetEmail,
+                        subject: 'Your Sign Up Verification Code (Resent)',
+                        message: `Your new verification code is: ${generatedCode}\n\nUse this code to verify your email and complete your signup.`,
+                        date_time: new Date().toLocaleString()
+                    }
+                );
+                showAlert('A new verification code has been sent!', 'success');
+                // Clear OTP fields
+                document.querySelectorAll('.otp-input').forEach(i => { i.value = ''; i.classList.remove('filled'); });
+                document.getElementById('otp0').focus();
+                startResendTimer();
+            } catch (err) {
+                console.error('Resend signup OTP error:', err);
+                showAlert('Failed to resend code. Please try again.');
+            }
+        }
     </script>
 </body>
 
